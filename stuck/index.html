@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stuck</title>
+  </head>
+  <body>
+    <p><span id="action">No</span> long running request</p>
+    <button id="upgrade" disabled>Click to skip waiting</button>
+    <script>
+      let newWorker
+      const button = document.getElementById('upgrade')
+      const listenStage = () => {
+        console.log(newWorker.state, +new Date())
+        if (newWorker.state === 'installed') {
+          button.removeAttribute('disabled')
+        } else if (newWorker.state === 'activated') {
+          location.reload()
+        }
+      }
+      navigator.serviceWorker.register('./service-worker.js').then((swr) => {
+        if (swr.waiting) {
+          newWorker = swr.waiting
+          newWorker.onstatechange = listenStage
+          listenStage() // Trigger installed
+        }
+        swr.onupdatefound = () => {
+          newWorker = swr.installing
+          newWorker.onstatechange = listenStage
+        }
+      })
+      button.addEventListener('click', function () {
+        // If there is a slow request when upgrading
+        const actionElement = document.getElementById('action')
+        actionElement.innerText = 'Doing'
+        fetch('slow.json').then(() => (actionElement.innerText = 'Done'))
+
+        // Ensure slow request is alive
+        setTimeout(() => newWorker.postMessage({ type: 'skip-waiting' }), 100)
+        this.setAttribute('disabled', true)
+      })
+    </script>
+  </body>
+</html>
